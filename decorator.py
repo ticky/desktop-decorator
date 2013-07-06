@@ -19,18 +19,19 @@ def main():
 	parser = argparse.ArgumentParser(description='Generate display-optimised wallpaper images from a directory of wallpapers.', epilog='Which is how you do it.')
 
 	cli_required = parser.add_argument_group('Required Arguments')
-	cli_required.add_argument('directory', metavar='directory', type=str, help='directory to load images from')
+	cli_required.add_argument('source', metavar='source', type=str, help='directory to load images from')
 
 	cli_output = parser.add_argument_group('Output Options')
 	cli_output.add_argument('-x', '--width', metavar='width', type=int, help='change desired width of wallpapers (default: detect desktop resolution)')
 	cli_output.add_argument('-y', '--height', metavar='height', type=int, help='change desired height of wallpapers (default: detect desktop resolution)')
 	cli_output.add_argument('-u', '--upscale', action='store_const', const=True, default=False, help='allow images to be scaled up, rather than only down')
+	cli_output.add_argument('-o', '--output', metavar='output', type=str, default='output-images', help='allow images to be scaled up, rather than only down')
 
 	cli_iproc = parser.add_argument_group('Image Processing Options')
 	cli_iproc.add_argument('-m', '--mask', action='store_const', const=True, default=False, help='enable centre masking (forces feature detection to focus on edges)')
 	cli_iproc.add_argument('-g', '--gradient-mask', action='store_const', const=True, default=False, help='use gradient centre masking (requires -m)')
 	cli_iproc.add_argument('-t', '--threshold', metavar='threshold', type=int, default=166, choices=range(256), help='change the threshold for feature detection, must be between 0 and 255 (default: 166)')
-	
+
 	cli_other = parser.add_argument_group('Other Options')
 	cli_other.add_argument('-v', '--verbose', action='store_const', const=True, default=False, help='show verbose (debug) output')
 	cli_args = parser.parse_args()
@@ -47,26 +48,32 @@ def main():
 
 	target_ratio = Fraction(cli_args.width, cli_args.height)
 
+	if not os.path.exists(cli_args.output):
+
+		os.makedirs(cli_args.output)
+
 	print 'Desktop Decorator'
 	print '================='
 	print 'Attempting to optimise wallpapers for a display at %sw @ %s...' % (cli_args.width, ratio_string(target_ratio))
 
-	for (dirpath, dirnames, filenames) in os.walk(cli_args.directory):
+	for (dirpath, dirnames, filenames) in os.walk(cli_args.source):
 
 		for name in filenames:
 
 			if os.path.splitext(name)[-1][1:] in ['jpg', 'jpeg', 'png']:
 
 				print '* Processing "%s"...' % os.path.splitext(name)[0]
+
 				image = Image.open(os.path.join(dirpath, name))
 				image = smart_crop(image, cli_args.width, cli_args.height, cli_args.upscale, cli_args.threshold, cli_args.mask, cli_args.gradient_mask)
-				image.save('images/%s.%s' % (os.path.splitext(name)[0], os.path.splitext(name)[-1][1:]))
+
+				image.save(os.path.join(cli_args.output, '%s.%s' % (os.path.splitext(name)[0], os.path.splitext(name)[-1][1:])))
 
 			else:
 
-				print '* %s is being ignored...' % os.path.splitext(name)[0]
+				print '* "%s" is being ignored...' % os.path.splitext(name)[0]
 
-	print 'Done.'
+	print 'Processing Complete.'
 
 # TODO: Move smart_crop and find_image_centroid into a library
 def smart_crop(target_image, target_width, target_height, allow_upscale=False, colour_threshold=166,
@@ -86,7 +93,7 @@ def smart_crop(target_image, target_width, target_height, allow_upscale=False, c
 
 		# If the image is the same size as we want, we can just output it as-is
 		if target_image.size[0] == target_width and target_image.size[1] == target_height:
-			
+
 			log('Image is correct size...')
 
 		# Otherwise, if we're allowed to upscale it, or if it's bigger than we need, scale it using
